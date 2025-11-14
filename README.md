@@ -23,3 +23,12 @@ The Unity folder contains the code for the Unity Application. This Application i
 - Render graph showing several data streams
 
 The UVCCameraPlugin folder contains the C++ code for the camera plugin. This is a Unity plugin. All the OpenCV code is being executed in here.
+
+# Important
+You need to download openCV 4.2 and get the `opencv_world420.dll` from the build folder and put it inside Plugins/UVC Camera Plugin next to `UVCCameraPlugin.dll`. If you don't do that you'll get below error message on play:
+
+```
+Plugins: Failed to load 'Assets/Plugins/UVC Camera Plugin/UVCCameraPlugin.dll' because one or more of its dependencies could not be loaded.
+```
+
+Also, you need to use Unity Editor version 2019.2.6f1. It won't run with newer versions.
