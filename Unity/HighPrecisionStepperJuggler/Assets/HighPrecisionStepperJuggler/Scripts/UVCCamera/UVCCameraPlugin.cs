@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Linq;
 using System.Runtime.InteropServices;
 using vcp = HighPrecisionStepperJuggler.OpenCVConstants.VideoCaptureProperties;
 using c = HighPrecisionStepperJuggler.Constants;
@@ -54,15 +55,21 @@ namespace HighPrecisionStepperJuggler
         private GCHandle _pixelsHandle;
         private IntPtr _pixelsPtr;
         private CameraProperties _defaultCameraProperties;
+        private ImageProcessing _imageProcessing = new ImageProcessing();
 
         [SerializeField] private Constants.ImgMode _imgMode;
         [SerializeField] private HT21Parameters _ht21Parameters;
         [SerializeField] private CameraProperties _cameraProperties;
-        [SerializeField] private RenderTexture _renderTexture = null;
-        [SerializeField] private MachineController _machineController;
+
+        public Constants.ImgMode ImgMode
+        {
+            set => _imgMode = value;
+        }
         
         private void Awake()
         {
+            _imgMode = Constants.ImgMode.Src;
+            
             _defaultCameraProperties = new CameraProperties()
             {
                 Width = c.CameraResolutionWidth,
@@ -75,7 +82,7 @@ namespace HighPrecisionStepperJuggler
             
             _ht21Parameters = new HT21Parameters()
             {
-                ExecuteHT21 = true,
+                ExecuteHT21 = false,
                 ExecuteMedianBlue = false,
                 Dp = 1,
                 MinDist = 120,
@@ -102,8 +109,17 @@ namespace HighPrecisionStepperJuggler
             _texture = new Texture2D((int) _defaultCameraProperties.Width, (int) _defaultCameraProperties.Height,
                 TextureFormat.ARGB32, false);
             _pixels = _texture.GetPixels32();
+            
             _pixelsHandle = GCHandle.Alloc(_pixels, GCHandleType.Pinned);
             _pixelsPtr = _pixelsHandle.AddrOfPinnedObject();
+
+            foreach (var c in _volume.profile.components)
+            {
+                if (c is OverlayComponent oc)
+                {
+                    oc.overlayParameter.value = _texture;
+                }
+            }
         }
 
         private double GetCameraProperty(vcp property)
@@ -141,48 +157,50 @@ namespace HighPrecisionStepperJuggler
         {
             if (Input.GetKeyDown(KeyCode.B))
             {
-                _imgMode--;
-                if ((int) _imgMode < 0)
-                {
-                    _imgMode = (Constants.ImgMode)Enum.GetNames(typeof(Constants.ImgMode)).Length - 1;
-                }
-
-                _captionView.SetText(Constants.Captions[(int) _imgMode]);
+                DecrementImgMode();
             }
 
             if (Input.GetKeyDown(KeyCode.N))
             {
-                _captionView.SetText(Constants.Captions[(int)_imgMode]);
+                _captionView.SetText(Constants.Captions[(int) _imgMode]);
             }
-                
+
             if (Input.GetKeyDown(KeyCode.M))
             {
-                _imgMode++;
-                if ((int)_imgMode >= Enum.GetNames(typeof(Constants.ImgMode)).Length)
-                {
-                    _imgMode = 0;
-                }
-                
-                _captionView.SetText(Constants.Captions[(int)_imgMode]);
+                IncrementImgMode();
             }
-            
+
             foreach (var c in _volume.profile.components)
             {
                 if (c is OverlayComponent oc)
                 {
-                    if(_imgMode == Constants.ImgMode.Red){oc.tintColor.value = Color.red;}
-                    else if(_imgMode == Constants.ImgMode.Green){oc.tintColor.value = Color.green;}
-                    else if(_imgMode == Constants.ImgMode.Blue){oc.tintColor.value = Color.blue;}
-                    else {oc.tintColor.value = Color.white;}
+                    if (_imgMode == Constants.ImgMode.Red)
+                    {
+                        oc.tintColor.value = Color.red;
+                    }
+                    else if (_imgMode == Constants.ImgMode.Green)
+                    {
+                        oc.tintColor.value = Color.green;
+                    }
+                    else if (_imgMode == Constants.ImgMode.Blue)
+                    {
+                        oc.tintColor.value = Color.blue;
+                    }
+                    else
+                    {
+                        oc.tintColor.value = Color.white;
+                    }
                 }
             }
-            
+
+            _ht21Parameters.ExecuteHT21 = _imgMode == Constants.ImgMode.CustomgrayWithCirclesOverlayed;
+
             getCameraTexture(
                 _camera,
                 _pixelsPtr,
                 _ht21Parameters.ExecuteHT21,
                 _ht21Parameters.ExecuteMedianBlue,
-                (int) _imgMode,
+                (int) _imgMode == 7 ? 5 : (int) _imgMode,
                 _ht21Parameters.Dp,
                 _ht21Parameters.MinDist,
                 _ht21Parameters.Param1,
@@ -191,20 +209,62 @@ namespace HighPrecisionStepperJuggler
                 _ht21Parameters.MaxRadius
             );
 
+            if ((int) _imgMode == 7)
+            {
+                var ballPosAndRadius = _imageProcessing.BallDataFromPixelBoarders(_pixels);
+
+                _texture.SetPixels32(_pixels);
+                _texture.Apply();
+
+                // TODO: return both ball positions, not only the first one.
+                return ballPosAndRadius.FirstOrDefault();
+            }
+
             _texture.SetPixels32(_pixels);
             _texture.Apply();
 
-            Graphics.Blit(_texture, _renderTexture);
-            
+            if (_imgMode == Constants.ImgMode.CustomgrayWithCirclesOverlayed)
+            {
+                return new BallRadiusAndPosition()
+                {
+                    Radius = (float) getCircleRadius(),
+                    PositionX = -(float) getCircleCenter_x() + c.CameraResolutionWidth / 2f,
+                    PositionY = -(float) getCircleCenter_y() + c.CameraResolutionHeight / 2f
+                };
+            }
+
             return new BallRadiusAndPosition()
             {
-                Radius = (float)getCircleRadius(), 
-                PositionX = -(float)getCircleCenter_x() + c.CameraResolutionWidth / 2f, 
-                PositionY = -(float)getCircleCenter_y() + c.CameraResolutionHeight / 2f
+                Radius = 0.1f,
+                PositionX = 0f + c.CameraResolutionWidth / 2f,
+                PositionY = 0f + c.CameraResolutionHeight / 2f
             };
+
         }
 
-        void OnApplicationQuit()
+        public void IncrementImgMode()
+        {
+            _imgMode++;
+            if ((int) _imgMode >= Enum.GetNames(typeof(Constants.ImgMode)).Length)
+            {
+                _imgMode = 0;
+            }
+
+            _captionView.SetText(Constants.Captions[(int) _imgMode]);
+        }
+
+        public void DecrementImgMode()
+        {
+            _imgMode--;
+            if ((int) _imgMode < 0)
+            {
+                _imgMode = (Constants.ImgMode) Enum.GetNames(typeof(Constants.ImgMode)).Length - 1;
+            }
+
+            _captionView.SetText(Constants.Captions[(int) _imgMode]);
+        }
+
+        private void OnApplicationQuit()
         {
             _pixelsHandle.Free();
             releaseCamera(_camera);

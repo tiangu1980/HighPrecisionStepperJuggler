@@ -1,4 +1,5 @@
-﻿using UnityEngine;
+﻿using HighPrecisionStepperJuggler.MachineLearning;
+using UnityEngine;
 
 namespace HighPrecisionStepperJuggler
 {
@@ -9,39 +10,90 @@ namespace HighPrecisionStepperJuggler
         private float _timeAtReset;
         private Vector3 _lastFramePositionVector;
 
+        public bool BallIsMovingUp => _ballIsMovingUp;
+        private bool _ballIsMovingUp;
+        
+        public float AirborneTime => Mathf.Clamp(_airborneTime, 0.1f, 2f);
+        private float _airborneTime;
+
+        public float TimeSinceLastBounce => (Time.realtimeSinceStartup - _collisionTime);
+        public float PredictedTimeTillNextHit => _airborneTime - TimeSinceLastBounce;
+        
+        private float _collisionTime;
+
+        private GradientDescent _gradientDescentX;
+        private GradientDescent _gradientDescentY;
+        private GradientDescent _gradientDescentZ;
+
+        // current ball position in [mm]
         public Vector3 CurrentPositionVector => _currentPositionVector;
-        public Vector3 CurrentUnityPositionVector => new Vector3(_currentPositionVector.x, _currentPositionVector.z + Constants.BallHeightAtOrigin, _currentPositionVector.y) / 1000f;
-        private Vector3 _currentPositionVector = Vector3.zero;
 
-        private VelocityDebugView _velocityDebugView;
+        // current ball velocity in [mm/s]
+        public Vector3 CurrentVelocityVector => _currentVelocityVector;
 
-        public BallData(VelocityDebugView velocityDebugView)
+
+        private Vector2 _predictedPositionVectorOnHit = Vector3.zero;
+        public Vector2 PredictedPositionVectorOnHit
         {
-            _velocityDebugView = velocityDebugView;
+            get
+            {
+                _predictedPositionVisualizer.Visualize(_predictedPositionVectorOnHit);
+                return _predictedPositionVectorOnHit;
+            }
         }
 
-        public void UpdateData(Vector3 positionVector, bool machineReadyForNextMove)
+        // NOTE: the units are [mm/s] 
+        public float CalculatedOnBounceDownwardsVelocity => (AirborneTime * 9.81f) / 2f * 1000f;
+
+        public Vector3 CurrentUnityPositionVector => new Vector3(
+                                                         _currentPositionVector.x,
+                                                         _currentPositionVector.z + Constants.BallHeightAtOrigin,
+                                                         _currentPositionVector.y) / 1000f;
+
+        private Vector3 _currentPositionVector = Vector3.zero;
+        private Vector3 _currentVelocityVector = Vector3.zero;
+
+        private BallDataDebugView _ballDataDebugView;
+        private PredictedPositionVisualizer _predictedPositionVisualizer;
+
+        public BallData(
+            BallDataDebugView ballDataDebugView, 
+            PredictedPositionVisualizer predictedPositionVisualizer,
+            GradientDescent gradientDescentX, 
+            GradientDescent gradientDescentY, 
+            GradientDescent gradientDescentZ)
+        {
+            _ballDataDebugView = ballDataDebugView;
+            _predictedPositionVisualizer = predictedPositionVisualizer;
+            
+            _gradientDescentX = gradientDescentX;
+            _gradientDescentY = gradientDescentY;
+            _gradientDescentZ = gradientDescentZ;
+        }
+
+        public void UpdateData(Vector3 positionVector, Vector3 velocityVector)
         {
             _currentPositionVector = positionVector;
-        }
+            _currentVelocityVector = velocityVector;
 
-        public Vector2 GetVelocityVector()
-        {
-            var v = new Vector2(
-                (CurrentPositionVector.x - _xDistanceAtReset) / (Time.realtimeSinceStartup - _timeAtReset),
-                (CurrentPositionVector.y - _yDistanceAtReset) / (Time.realtimeSinceStartup - _timeAtReset));
+            var ballWasMovingUpLastFrame = _ballIsMovingUp;
+            _ballIsMovingUp = _gradientDescentZ.Hypothesis.Parameters.Theta_1 > 0.0f;
 
-            _velocityDebugView.Vx = v.x.ToString("0.000");
-            _velocityDebugView.Vy = v.y.ToString("0.000");
-            
-            return v;
-        }
+            if (!ballWasMovingUpLastFrame && _ballIsMovingUp)
+            {
+                // ball has hit the plate and is now moving up again
+                _airborneTime = Time.realtimeSinceStartup - _collisionTime;
 
-        public void ResetVelocityAccumulation()
-        {
-            _xDistanceAtReset = CurrentPositionVector.x;
-            _yDistanceAtReset = CurrentPositionVector.y;
-            _timeAtReset = Time.realtimeSinceStartup;
+                _collisionTime = Time.realtimeSinceStartup;
+            }
+
+            _ballDataDebugView.AirborneTime = AirborneTime.ToString("0.00");
+            _ballDataDebugView.TimeTillNextHit = PredictedTimeTillNextHit.ToString("0.00");
+
+            _predictedPositionVectorOnHit = new Vector2(
+                _currentPositionVector.x + _gradientDescentX.Hypothesis.Parameters.Theta_1 * PredictedTimeTillNextHit,
+                _currentPositionVector.y + _gradientDescentY.Hypothesis.Parameters.Theta_1 * PredictedTimeTillNextHit
+            );
         }
     }
 }

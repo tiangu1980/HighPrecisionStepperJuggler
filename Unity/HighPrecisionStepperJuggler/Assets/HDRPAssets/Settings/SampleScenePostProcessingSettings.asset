@@ -19,7 +19,16 @@ MonoBehaviour:
     m_Value: 1
   overlayParameter:
     m_OverrideState: 1
-    m_Value: {fileID: 8400000, guid: aea317be466d9c645a30a4ee986e9a8d, type: 2}
+    m_Value: {fileID: 0}
+  secondOverlayParameter:
+    m_OverrideState: 1
+    m_Value: {fileID: 0}
+  fullScreenOverlay:
+    m_OverrideState: 1
+    m_Value: {fileID: 2800000, guid: 4114b77a1e52bfd47a812b5bb1beb631, type: 3}
+  fullScreenOverlayOpacity:
+    m_OverrideState: 0
+    m_Value: 1
   tintColor:
     m_OverrideState: 1
     m_Value: {r: 1, g: 1, b: 1, a: 1}
@@ -39,10 +48,10 @@ MonoBehaviour:
   m_Name: SampleScenePostProcessingSettings
   m_EditorClassIdentifier: 
   components:
-  - {fileID: 8711377374188185572}
   - {fileID: 3109681608999342120}
   - {fileID: 396278178000043239}
   - {fileID: -7610046736956500591}
+  - {fileID: 4538161051340441407}
 --- !u!114 &396278178000043239
 MonoBehaviour:
   m_ObjectHideFlags: 3
@@ -139,7 +148,7 @@ MonoBehaviour:
     m_OverrideState: 0
     m_Value: 1
     min: 0.001
---- !u!114 &8711377374188185572
+--- !u!114 &4538161051340441407
 MonoBehaviour:
   m_ObjectHideFlags: 3
   m_CorrespondingSourceObject: {fileID: 0}
@@ -148,45 +157,17 @@ MonoBehaviour:
   m_GameObject: {fileID: 0}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 2c1be1b6c95cd2e41b27903b9270817f, type: 3}
-  m_Name: Vignette
+  m_Script: {fileID: 11500000, guid: 4b709909182ba0943abef2c49ed59205, type: 3}
+  m_Name: PaniniProjection
   m_EditorClassIdentifier: 
-  active: 0
+  active: 1
   m_AdvancedMode: 0
-  mode:
-    m_OverrideState: 0
-    m_Value: 1
-  color:
-    m_OverrideState: 0
-    m_Value: {r: 0, g: 0, b: 0, a: 1}
-    hdr: 0
-    showAlpha: 0
-    showEyeDropper: 1
-  center:
-    m_OverrideState: 0
-    m_Value: {x: 0.5, y: 0.5}
-  intensity:
+  distance:
     m_OverrideState: 1
-    m_Value: 0.25
-    min: 0
-    max: 1
-  smoothness:
-    m_OverrideState: 0
-    m_Value: 0.2
-    min: 0.01
-    max: 1
-  roundness:
-    m_OverrideState: 0
     m_Value: 1
     min: 0
     max: 1
-  rounded:
-    m_OverrideState: 0
-    m_Value: 0
-  mask:
-    m_OverrideState: 0
-    m_Value: {fileID: 0}
-  opacity:
+  cropToFit:
     m_OverrideState: 0
     m_Value: 1
     min: 0

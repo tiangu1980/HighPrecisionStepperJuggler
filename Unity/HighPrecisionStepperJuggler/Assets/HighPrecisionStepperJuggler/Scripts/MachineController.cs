@@ -12,6 +12,8 @@ namespace HighPrecisionStepperJuggler
         private float _elapsedTime;
         private float _totalMoveTime;
 
+        private HLMachineState _levelingOffset = new HLMachineState(0f, 0f, 0f);
+
         public bool IsReadyForNextInstruction => _elapsedTime > _totalMoveTime;
 
         private enum MachineEndPoint
@@ -40,22 +42,22 @@ namespace HighPrecisionStepperJuggler
 
             if (Input.GetKeyDown(KeyCode.UpArrow))
             {
-                SendSingleInstruction(new HLInstruction(0.01f, 0f, 0.001f, 0.2f, true));
+                SendSingleInstruction(new HLInstruction(0.01f, 0f, 0.05f, 0.2f, true));
             }
 
             if (Input.GetKeyDown(KeyCode.DownArrow))
             {
-                SendSingleInstruction(new HLInstruction(0.01f, 0f, -0.001f, 0.2f, true));
+                SendSingleInstruction(new HLInstruction(0.01f, 0f, -0.05f, 0.2f, true));
             }
 
             if (Input.GetKeyDown(KeyCode.LeftArrow))
             {
-                SendSingleInstruction(new HLInstruction(0.01f, 0.001f, 0f, 0.2f, true));
+                SendSingleInstruction(new HLInstruction(0.01f, 0.05f, 0f, 0.2f, true));
             }
 
             if (Input.GetKeyDown(KeyCode.RightArrow))
             {
-                SendSingleInstruction(new HLInstruction(0.01f, -0.001f, 0f, 0.2f, true));
+                SendSingleInstruction(new HLInstruction(0.01f, -0.05f, 0f, 0.2f, true));
             }
 
             if (Input.GetKeyDown(KeyCode.O))
@@ -110,6 +112,9 @@ namespace HighPrecisionStepperJuggler
 
             if (Input.GetKeyDown(KeyCode.Alpha0))
             {
+                SendSingleInstruction(new HLInstruction(0.002f, 0f, 0f, 0.25f));
+                
+                /*
                 var moveTime = 0.3f;
                 var tilt = 0.06694f;
                 SendInstructions(new List<HLInstruction>()
@@ -143,6 +148,7 @@ namespace HighPrecisionStepperJuggler
                     new HLInstruction(0.01f, 0.0f, 0.0f, 0.5f),
                     new HLInstruction(0.05f, 0.0f, 0.0f, 0.5f),
                 });
+                */
             }
         }
 
@@ -152,8 +158,23 @@ namespace HighPrecisionStepperJuggler
             {
                 return;
             }
+            
+            // add tilt as HighLevelInstruction in here
+            var levelingInstructions = instructions.Where(instruction => instruction.IsLevelingInstruction);
+
+            foreach (var instruction in levelingInstructions)
+            {
+                var levelingOnlyState = instruction.TargetHLMachineState -
+                                        new HLInstruction(0.01f, 0f, 0f, 0.2f).TargetHLMachineState;
                 
-            var llInstructions = instructions.Select(instruction => instruction.Translate()).ToList();
+                _levelingOffset += levelingOnlyState;
+            }
+
+            var llInstructions = instructions.Select(instruction =>
+            {
+                var i = instruction + new HLInstruction(_levelingOffset, 0f, instruction.IsLevelingInstruction);
+                return i.Translate();
+            }).ToList();
 
             _totalMoveTime = 0f;
             _elapsedTime = 0f;
@@ -161,7 +182,8 @@ namespace HighPrecisionStepperJuggler
             {
                 _totalMoveTime += instruction.MoveTime;
             }
-            _totalMoveTime *= 1.1f;
+            //NOTE: we're adding 50ms to make sure that the microcontroller is done before new data gets sent.
+            _totalMoveTime += 0.050f;
             
             switch (_machineEndPoint)
             {

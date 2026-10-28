@@ -1,4 +1,6 @@
-﻿using UnityEngine;
+﻿using System;
+using UniRx;
+using UnityEngine;
 
 namespace HighPrecisionStepperJuggler
 {
@@ -13,6 +15,9 @@ namespace HighPrecisionStepperJuggler
         [SerializeField] private BasicRotationalJoint _upperMostRotationalJoint2 = null;
         [SerializeField] private BasicRotationalJoint _upperMostRotationalJoint3 = null;
         [SerializeField] private BasicRotationalJoint _upperMostRotationalJoint4 = null;
+        
+        public IObservable<(float xTilt, float yTilt)> OnTiltUpdated => _onTiltUpdated;
+        private Subject<(float, float)> _onTiltUpdated = new Subject<(float, float)>();
 
         void LateUpdate()
         {
@@ -28,6 +33,8 @@ namespace HighPrecisionStepperJuggler
             _upperMostRotationalJoint2.Rotation = beta;
             _upperMostRotationalJoint3.Rotation = gamma;
             _upperMostRotationalJoint4.Rotation = -gamma;
+
+            _onTiltUpdated.OnNext((gamma, -beta));
         }
     }
 }
